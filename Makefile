@@ -22,6 +22,9 @@ release: install test ## Bump version, commit, and tag (part=patch|minor|major)
 	git add --all
 	git diff --quiet --staged || git commit
 	$(VENV)/bin/bump-my-version bump $(part)
+	@version=$$($(VENV)/bin/bump-my-version show current_version) && \
+	echo "Tagging v$$version — enter release notes (opens editor)..." && \
+	git tag -a "v$$version" --edit -m "v$$version"
 	git push --follow-tags
 
 clean: ## Remove the venv and build artifacts
