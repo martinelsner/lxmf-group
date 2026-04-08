@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+
+# Nix
+result
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+.pytest_cache
+.hypothesis/
+.kiro/

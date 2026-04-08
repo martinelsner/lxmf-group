@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lxmf-group"
+dynamic = ["version"]
+description = "Server-Side group functions for LXMF based apps"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "rns",
+    "lxmf",
+    "lxmfy @ git+https://git.quad4.io/LXMFy/LXMFy.git@36e2b5c9210703b9cfd7867ddacda991574c53dc",
+    "platformdirs",
+    "qrcode",
+    "msgpack",
+]
+
+[project.scripts]
+lxmf-group = "lxmf_group:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "hypothesis",
+    "bump-my-version",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.version]
+path = "lxmf_group/_version.py"
+
+[project.urls]
+Repository = "https://codeberg.org/melsner/lxmf_group"
+
+[tool.bumpversion]
+current_version = "1.4.2"
+commit = true
+tag = true
+
+[[tool.bumpversion.files]]
+filename = "lxmf_group/_version.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
