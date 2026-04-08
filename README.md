@@ -125,6 +125,14 @@ Enable and start:
 sudo systemctl enable --now lxmf-group
 ```
 
+Check the claim token and QR code in the journal:
+
+```bash
+journalctl --unit lxmf-group --output=cat -n 30
+```
+
+Use `--output=cat` so the QR code ANSI colours are preserved and the code is scannable directly from the terminal.
+
 ## Documentation
 
 - [Concepts](docs/concepts.md) — groups, roles, message transport

@@ -61,7 +61,9 @@ sudo nixos-rebuild switch
 On first start, the Admin Group is created and a one-time claim token is printed to the journal:
 
 ```bash
-journalctl --unit lxmf-group -n 30
+journalctl --unit lxmf-group --output=cat -n 30
 ```
+
+Use `--output=cat` so the QR code ANSI colours are preserved and the code is scannable directly from the terminal.
 
 Send the token to the Admin Group's LXMF address to become admin. Then use `/create_group <name>` to create groups.
