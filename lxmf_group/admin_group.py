@@ -9,6 +9,7 @@ import RNS
 from .base_group import BaseGroup
 from .helpers import qr_unicode
 from .interfaces import ServerInterface
+from lxmfy import JSONStorage
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -18,15 +19,17 @@ class AdminGroup(BaseGroup):
 
     _kind: str = "Admin Group"
 
-    def __init__(self, server: ServerInterface) -> None:
-        self.data_dir = os.path.join(server.data_dir, "admin")
-        if not os.path.exists(self.data_dir):
-            identity, address = self._generate_identity()
-            self._create_data_dir(data_dir=self.data_dir, identity=identity)
+    @staticmethod
+    def ensure(server: ServerInterface) -> str:
+        data_dir = os.path.join(server.data_dir, "admin")
+        if not os.path.exists(data_dir):
+            identity, address = BaseGroup._generate_identity()
+            BaseGroup._create_data_dir(data_dir=data_dir, identity=identity)
             name_suffix = address[-4:]
-            self.name = f"Admin Group {name_suffix}"
-
-        super().__init__(self.data_dir, server)
+            name = f"Admin Group {name_suffix}"
+            storage = JSONStorage(BaseGroup._storage_dir(data_dir))
+            storage.set("name", name)
+        return data_dir
 
     def show_admin_claim(self):
         if not self._all_members():

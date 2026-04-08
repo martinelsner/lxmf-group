@@ -32,7 +32,8 @@ class Server(ServerInterface):
         # this instance.
         RNS.Reticulum(configdir=rnsconfig)
 
-        self.admin_group = AdminGroup(server=self)
+        admin_group_data_dir = AdminGroup.ensure(server=self)
+        self.admin_group = AdminGroup(server=self, data_dir=admin_group_data_dir)
         self.admin_group.setup()
         self.admin_group.start()
         self.admin_group.show_admin_claim()
