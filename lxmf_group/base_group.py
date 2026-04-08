@@ -23,6 +23,7 @@ from lxmfy.help import HelpFormatter, HelpSystem
 
 from .helpers import CommandDict, qr_unicode, short_hash
 from .interfaces import ServerInterface
+from .constants import ANNOUNCE_INTERVAL
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class BaseGroup:
 
         self.bot: LXMFBot = LXMFBot(
             name=self.name or self._kind,
-            announce=3600,
+            announce=ANNOUNCE_INTERVAL,
             announce_enabled=True,
             announce_immediately=True,
             command_prefix="/",
