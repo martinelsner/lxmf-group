@@ -58,7 +58,11 @@ def short_hash(address: str) -> str:
 
 
 def qr_unicode(data: str) -> str:
-    """Render a QR code using ANSI colors and half-block characters."""
+    """Render a QR code using half-block characters.
+
+    Uses block-element characters so the output is readable on any
+    background without relying on ANSI colour escapes.
+    """
     try:
         qr = qrcode.QRCode(
             error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -69,22 +73,24 @@ def qr_unicode(data: str) -> str:
         qr.make(fit=True)
         matrix = qr.get_matrix()
         rows = len(matrix)
+        DARK = "\u2588"
+        LIGHT = "\u2591"
+        TOP_DARK = "\u2580"
+        BOT_DARK = "\u2584"
         lines = []
-        RESET = "\033[0m"
         for y in range(0, rows, 2):
             line = ""
             for x in range(len(matrix[0])):
                 top = matrix[y][x]
                 bottom = matrix[y + 1][x] if y + 1 < rows else False
                 if top and bottom:
-                    line += "\033[30;40m\u2588"
+                    line += DARK
                 elif top and not bottom:
-                    line += "\033[30;47m\u2580"
+                    line += TOP_DARK
                 elif not top and bottom:
-                    line += "\033[30;47m\u2584"
+                    line += BOT_DARK
                 else:
-                    line += "\033[37;47m "
-            line += RESET
+                    line += LIGHT
             lines.append(line)
         return "\n".join(lines)
     except Exception:

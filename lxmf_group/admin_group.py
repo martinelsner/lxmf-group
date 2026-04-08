@@ -11,6 +11,7 @@ import RNS
 from lxmfy import JSONStorage
 
 from .base_group import BaseGroup
+from .constants import ANNOUNCE_INTERVAL, DESCRIPTION, NAME, VERSION
 from .group import Group
 from .helpers import qr_unicode
 from .interfaces import ServerInterface
@@ -161,6 +162,20 @@ class AdminGroup(BaseGroup):
                 return
             self._add_member(address, is_admin=True)
             self._broadcast(f"{address} has been added as admin.", exclude={address})
+
+        @self.bot.command(
+            name="server_info",
+            description="Show server constants",
+            admin_only=True,
+        )
+        def server_info(ctx: Any) -> None:
+            lines = [
+                f"Name: {NAME}",
+                f"Version: {VERSION}",
+                f"Description: {DESCRIPTION}",
+                f"Announce interval: {ANNOUNCE_INTERVAL}s",
+            ]
+            ctx.reply("\n".join(lines))
 
         @self.bot.command(
             name="list_groups",
