@@ -58,10 +58,14 @@ def short_hash(address: str) -> str:
 
 
 def qr_unicode(data: str) -> str:
-    """Render a QR code using half-block characters.
+    """Render a QR code as black-on-white using ANSI colours.
 
-    Uses block-element characters so the output is readable on any
-    background without relying on ANSI colour escapes.
+    Every cell carries explicit foreground and background colours so the
+    result is independent of the terminal's own colour scheme.  The QR
+    border is rendered as solid white.
+
+    For journalctl output use ``journalctl --output=cat`` to preserve the
+    ANSI escapes.
     """
     try:
         qr = qrcode.QRCode(
@@ -73,10 +77,9 @@ def qr_unicode(data: str) -> str:
         qr.make(fit=True)
         matrix = qr.get_matrix()
         rows = len(matrix)
-        DARK = "\u2588"
-        LIGHT = "\u2591"
-        TOP_DARK = "\u2580"
-        BOT_DARK = "\u2584"
+        # ▀ = top half is foreground, bottom half is background
+        # ▄ = bottom half is foreground, top half is background
+        RESET = "\033[0m"
         lines = []
         for y in range(0, rows, 2):
             line = ""
@@ -84,13 +87,18 @@ def qr_unicode(data: str) -> str:
                 top = matrix[y][x]
                 bottom = matrix[y + 1][x] if y + 1 < rows else False
                 if top and bottom:
-                    line += DARK
+                    # both dark: white bg doesn't matter, black block
+                    line += "\033[30;40m\u2588"
                 elif top and not bottom:
-                    line += TOP_DARK
+                    # top dark, bottom light: ▀ fg=black, bg=white
+                    line += "\033[30;47m\u2580"
                 elif not top and bottom:
-                    line += BOT_DARK
+                    # top light, bottom dark: ▄ fg=black, bg=white
+                    line += "\033[30;47m\u2584"
                 else:
-                    line += LIGHT
+                    # both light: white space
+                    line += "\033[47m "
+            line += RESET
             lines.append(line)
         return "\n".join(lines)
     except Exception:
