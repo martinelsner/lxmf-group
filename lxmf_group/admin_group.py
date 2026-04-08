@@ -2,14 +2,18 @@
 
 import logging
 import os.path
+import queue
+import shutil
+import threading
 from typing import Any
 
 import RNS
+from lxmfy import JSONStorage
 
 from .base_group import BaseGroup
+from .group import Group
 from .helpers import qr_unicode
 from .interfaces import ServerInterface
-from lxmfy import JSONStorage
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -19,8 +23,13 @@ class AdminGroup(BaseGroup):
 
     _kind: str = "Admin Group"
 
+    def __init__(self, server: ServerInterface, data_dir: str) -> None:
+        super().__init__(data_dir=data_dir, server=server)
+        self._pending: queue.Queue = queue.Queue()
+
     @staticmethod
-    def ensure(server: ServerInterface) -> str:
+    def setup(server: ServerInterface) -> str:
+        """Creates and prepares the working dir of the admin group."""
         data_dir = os.path.join(server.data_dir, "admin")
         if not os.path.exists(data_dir):
             identity, address = BaseGroup._generate_identity()
@@ -31,9 +40,103 @@ class AdminGroup(BaseGroup):
             storage.set("name", name)
         return data_dir
 
-    def show_admin_claim(self):
+    def start(self) -> None:
+        super().start()
+        self._show_admin_claim()
+
+    def _show_admin_claim(self):
         if not self._all_members():
             self._setup_admin_claim()
+
+    # ------------------------------------------------------------------
+    # Pending-task queue (thread-safe group startup)
+    # ------------------------------------------------------------------
+
+    def tick(self):
+        """Drain the pending-task queue. Call from the main thread."""
+        while not self._pending.empty():
+            try:
+                task = self._pending.get_nowait()
+                task()
+            except queue.Empty:
+                break
+            except Exception as e:
+                logger.error("Error in pending task: %s", e)
+
+    # ------------------------------------------------------------------
+    # Group CRUD
+    # ------------------------------------------------------------------
+
+    def create_group(self, name: str, creator: str) -> Group:
+        """Create a new group and schedule its startup.
+
+        Returns the newly created and started Group.
+        """
+        group_path = Group.setup(
+            base_dir=self.server.groups_dir, name=name, admin=creator
+        )
+
+        # Schedule actual startup on the main thread.
+        done = threading.Event()
+        result: dict = {}
+
+        def _do_start():
+            try:
+                group = Group(data_dir=group_path, server=self.server)
+                group.on_delete = self._handle_group_delete
+                group.start()
+                self.server.groups.append(group)
+                logger.critical(
+                    "Group created and started: %s (%s)",
+                    name,
+                    os.path.basename(group_path),
+                )
+                result["group"] = group
+            except Exception as e:
+                result["error"] = str(e)
+            finally:
+                done.set()
+
+        self._pending.put(_do_start)
+        done.wait(timeout=30)
+
+        if not done.is_set():
+            raise RuntimeError("Group setup timed out")
+        if "group" in result:
+            return result["group"]
+        raise RuntimeError(result.get("error", "Unknown error"))
+
+    def remove_group(self, address: str) -> None:
+        """Stop and remove a group by its LXMF address hash."""
+        address = address.strip()
+        if not address:
+            raise ValueError("Invalid group address")
+
+        target = self.find_group(address)
+        if target is None:
+            raise ValueError(f"Group with address '{address}' not found")
+
+        group_path = target.data_dir
+        target.stop()
+        self.server.groups.remove(target)
+        shutil.rmtree(group_path)
+        logger.critical("Group removed: %s", address)
+
+    def _handle_group_delete(self, group: Group) -> None:
+        """Callback for Group.cmd_delete — removes the group by reference."""
+        self.remove_group(group.destination_hash_str())
+
+    def find_group(self, address: str) -> Group | None:
+        """Find a running group by its LXMF address hash."""
+        address = address.strip()
+        for g in self.server.groups:
+            if g.destination_hash_str() == address:
+                return g
+        return None
+
+    def list_group_names(self) -> list[tuple[str, str]]:
+        """Return a list of (display_name, address) for running groups."""
+        return [(g.name or "?", g.destination_hash_str()) for g in self.server.groups]
 
     # ------------------------------------------------------------------
     # Commands
@@ -43,8 +146,10 @@ class AdminGroup(BaseGroup):
         super()._register_commands()
 
         @self.bot.command(
-            name="admin", description="Add an admin to the Admin Group",
-            usage="/admin <address>", admin_only=True,
+            name="admin",
+            description="Add an admin to the Admin Group",
+            usage="/admin <address>",
+            admin_only=True,
         )
         def cmd_admin(ctx: Any) -> None:
             address = ctx.args[0] if ctx.args else ""
@@ -58,10 +163,12 @@ class AdminGroup(BaseGroup):
             self._broadcast(f"{address} has been added as admin.", exclude={address})
 
         @self.bot.command(
-            name="list_groups", description="List all running groups", admin_only=True,
+            name="list_groups",
+            description="List all running groups",
+            admin_only=True,
         )
         def list_groups(ctx: Any) -> None:
-            entries = self.server.list_group_names()
+            entries = self.list_group_names()
             if not entries:
                 ctx.reply("No groups running")
                 return
@@ -71,14 +178,16 @@ class AdminGroup(BaseGroup):
             ctx.reply("\n".join(lines))
 
         @self.bot.command(
-            name="group_info", description="Show details of a group", admin_only=True,
+            name="group_info",
+            description="Show details of a group",
+            admin_only=True,
         )
         def group_info(ctx: Any) -> None:
             address = ctx.args[0] if ctx.args else ""
             if not address:
                 ctx.reply("Usage: /group_info <address>")
                 return
-            group = self.server.find_group(address)
+            group = self.find_group(address)
             if not group:
                 ctx.reply(f"Error: Group '{address}' not found")
                 return
@@ -95,7 +204,9 @@ class AdminGroup(BaseGroup):
             ctx.reply("\n".join(lines))
 
         @self.bot.command(
-            name="create_group", description="Create a new group", admin_only=True,
+            name="create_group",
+            description="Create a new group",
+            admin_only=True,
         )
         def create_group(ctx: Any) -> None:
             name = " ".join(ctx.args) if ctx.args else ""
@@ -103,7 +214,7 @@ class AdminGroup(BaseGroup):
                 ctx.reply("Usage: /create_group <name>")
                 return
             try:
-                group = self.server.create_group(name, creator=ctx.sender)
+                group = self.create_group(name, creator=ctx.sender)
             except Exception as e:
                 ctx.reply(f"Error: {e}")
                 return
@@ -112,7 +223,9 @@ class AdminGroup(BaseGroup):
             group.bot.send(ctx.sender, f"Welcome to {name}! You are the group admin.")
 
         @self.bot.command(
-            name="remove_group", description="Remove a group by address", admin_only=True,
+            name="remove_group",
+            description="Remove a group by address",
+            admin_only=True,
         )
         def remove_group(ctx: Any) -> None:
             address = ctx.args[0] if ctx.args else ""
@@ -120,14 +233,16 @@ class AdminGroup(BaseGroup):
                 ctx.reply("Usage: /remove_group <address>")
                 return
             try:
-                self.server.remove_group(address)
+                self.remove_group(address)
             except Exception as e:
                 ctx.reply(f"Error: {e}")
                 return
             ctx.reply(f"Group removed: {address}")
 
         @self.bot.command(
-            name="rename_group", description="Rename a group", admin_only=True,
+            name="rename_group",
+            description="Rename a group",
+            admin_only=True,
         )
         def rename_group(ctx: Any) -> None:
             if len(ctx.args) < 2:
@@ -135,7 +250,7 @@ class AdminGroup(BaseGroup):
                 return
             address = ctx.args[0]
             new_name = " ".join(ctx.args[1:])
-            group = self.server.find_group(address)
+            group = self.find_group(address)
             if not group:
                 ctx.reply(f"Error: Group '{address}' not found")
                 return
@@ -145,7 +260,9 @@ class AdminGroup(BaseGroup):
             ctx.reply(f"Group renamed: {address} -> {new_name}")
 
         @self.bot.command(
-            name="assign_admin", description="Assign an admin to a group", admin_only=True,
+            name="assign_admin",
+            description="Assign an admin to a group",
+            admin_only=True,
         )
         def assign_admin(ctx: Any) -> None:
             if len(ctx.args) < 2:
@@ -153,7 +270,7 @@ class AdminGroup(BaseGroup):
                 return
             group_address = ctx.args[0]
             user_hash = ctx.args[1]
-            group = self.server.find_group(group_address)
+            group = self.find_group(group_address)
             if not group:
                 ctx.reply(f"Error: Group '{group_address}' not found")
                 return
@@ -167,7 +284,9 @@ class AdminGroup(BaseGroup):
             ctx.reply(f"Admin assigned: {user_hash} -> {group.name}")
 
         @self.bot.command(
-            name="remove_admin", description="Remove an admin from a group", admin_only=True,
+            name="remove_admin",
+            description="Remove an admin from a group",
+            admin_only=True,
         )
         def remove_admin(ctx: Any) -> None:
             if len(ctx.args) < 2:
@@ -175,7 +294,7 @@ class AdminGroup(BaseGroup):
                 return
             group_address = ctx.args[0]
             user_hash = ctx.args[1]
-            group = self.server.find_group(group_address)
+            group = self.find_group(group_address)
             if not group:
                 ctx.reply(f"Error: Group '{group_address}' not found")
                 return
@@ -223,15 +342,15 @@ class AdminGroup(BaseGroup):
         """Generate and log a one-time claim token."""
         token = RNS.hexrep(RNS.Identity.get_random_hash()[:8], delimit=False)
         self.claim_token = token
-        logger.critical("  No admin defined for %s.", self._kind)
-        logger.critical("  Send this token to claim admin:")
+        logger.critical("No admin defined for %s.", self._kind)
+        logger.critical("Send this token to claim admin:")
         logger.critical("")
-        logger.critical("    %s", token)
+        logger.critical("%s", token)
         logger.critical("")
         qr_text = qr_unicode(token)
         if qr_text:
             for line in qr_text.splitlines():
                 logger.critical("%s", line)
             logger.critical("")
-        logger.critical("  This token can only be used once.")
+        logger.critical("This token can only be used once.")
         logger.critical("")

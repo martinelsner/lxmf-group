@@ -26,24 +26,35 @@ def test_new_user_joins_public_group(group_server, isolated_rns):
 
     client_identity = RNS.Identity()
     client_dest = RNS.Destination(
-        client_identity, RNS.Destination.IN, RNS.Destination.SINGLE,
-        "lxmf", "delivery",
+        client_identity,
+        RNS.Destination.IN,
+        RNS.Destination.SINGLE,
+        "lxmf",
+        "delivery",
     )
     RNS.Identity.remember(
-        packet_hash=None, destination_hash=client_dest.hash,
-        public_key=client_identity.get_public_key(), app_data=None,
+        packet_hash=None,
+        destination_hash=client_dest.hash,
+        public_key=client_identity.get_public_key(),
+        app_data=None,
     )
     client_hash = RNS.hexrep(client_dest.hash, delimit=False)
 
     assert not group._is_member(client_hash)
 
     server_dest = RNS.Destination(
-        group.bot.identity, RNS.Destination.OUT, RNS.Destination.SINGLE,
-        "lxmf", "delivery",
+        group.bot.identity,
+        RNS.Destination.OUT,
+        RNS.Destination.SINGLE,
+        "lxmf",
+        "delivery",
     )
     lxm = LXMF.LXMessage(
-        server_dest, client_dest, "Hello group!",
-        title="", desired_method=LXMF.LXMessage.DIRECT,
+        server_dest,
+        client_dest,
+        "Hello group!",
+        title="",
+        desired_method=LXMF.LXMessage.DIRECT,
     )
     lxm.source_hash = client_dest.hash
     lxm.destination_hash = group.bot.local.hash
@@ -68,22 +79,33 @@ def test_private_group_rejects_unknown_user(group_server, isolated_rns):
 
     client_identity = RNS.Identity()
     client_dest = RNS.Destination(
-        client_identity, RNS.Destination.IN, RNS.Destination.SINGLE,
-        "lxmf", "delivery",
+        client_identity,
+        RNS.Destination.IN,
+        RNS.Destination.SINGLE,
+        "lxmf",
+        "delivery",
     )
     RNS.Identity.remember(
-        packet_hash=None, destination_hash=client_dest.hash,
-        public_key=client_identity.get_public_key(), app_data=None,
+        packet_hash=None,
+        destination_hash=client_dest.hash,
+        public_key=client_identity.get_public_key(),
+        app_data=None,
     )
     client_hash = RNS.hexrep(client_dest.hash, delimit=False)
 
     server_dest = RNS.Destination(
-        group.bot.identity, RNS.Destination.OUT, RNS.Destination.SINGLE,
-        "lxmf", "delivery",
+        group.bot.identity,
+        RNS.Destination.OUT,
+        RNS.Destination.SINGLE,
+        "lxmf",
+        "delivery",
     )
     lxm = LXMF.LXMessage(
-        server_dest, client_dest, "Let me in!",
-        title="", desired_method=LXMF.LXMessage.DIRECT,
+        server_dest,
+        client_dest,
+        "Let me in!",
+        title="",
+        desired_method=LXMF.LXMessage.DIRECT,
     )
     lxm.source_hash = client_dest.hash
     lxm.destination_hash = group.bot.local.hash
@@ -172,11 +194,9 @@ def group_server(isolated_rns, tmp_path):
     # Use a stub server to avoid needing the full Server class
     class _StubServer:
         data_dir = str(tmp_path / "server")
-        def create_group(self, *a, **kw): raise NotImplementedError
-        def remove_group(self, *a, **kw): raise NotImplementedError
-        def find_group(self, *a, **kw): return None
-        def list_group_names(self): return []
+        groups_dir = str(tmp_path / "server" / "groups")
+        groups = []
 
     group = Group(data_dir=group_dir, server=_StubServer())
-    group.setup()
+    group._show_qr_code()
     yield group

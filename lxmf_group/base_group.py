@@ -16,8 +16,8 @@ import threading
 from functools import cache, cached_property
 from typing import Any
 
-import RNS
 import msgpack
+import RNS
 from lxmfy import DefaultPerms, JSONStorage, LXMFBot
 from lxmfy.help import HelpFormatter, HelpSystem
 
@@ -158,14 +158,6 @@ class BaseGroup:
             self.bot.permissions.save_data()
         self.bot.admins.discard(user_hash)
 
-    def _promote_to_admin(self, user_hash: str) -> None:
-        self.bot.permissions.assign_role(user_hash, "admin")
-        self.bot.admins.add(user_hash)
-
-    def _demote_from_admin(self, user_hash: str) -> None:
-        self.bot.permissions.remove_role(user_hash, "admin")
-        self.bot.admins.discard(user_hash)
-
     def _all_members(self) -> set[str]:
         """Return the set of all user hashes that have any role."""
         return set(self.bot.permissions.user_roles.keys())
@@ -302,8 +294,10 @@ class BaseGroup:
             ctx.reply("\n".join(lines))
 
         @self.bot.command(
-            name="kick", description="Remove a user",
-            usage="/kick <address>", admin_only=True,
+            name="kick",
+            description="Remove a user",
+            usage="/kick <address>",
+            admin_only=True,
         )
         def cmd_kick(ctx: Any) -> None:
             address = ctx.args[0] if ctx.args else ""
@@ -322,8 +316,10 @@ class BaseGroup:
             ctx.reply(f"Removed {address}.")
 
         @self.bot.command(
-            name="name", description="Rename this group",
-            usage="/name <new_name>", admin_only=True,
+            name="name",
+            description="Rename this group",
+            usage="/name <new_name>",
+            admin_only=True,
         )
         def cmd_name(ctx: Any) -> None:
             new_name = " ".join(ctx.args) if ctx.args else ""
@@ -335,8 +331,10 @@ class BaseGroup:
             self._broadcast(f"Renamed from '{old_name}' to '{new_name}'.")
 
         @self.bot.command(
-            name="description", description="Set the group description",
-            usage="/description <text>", admin_only=True,
+            name="description",
+            description="Set the group description",
+            usage="/description <text>",
+            admin_only=True,
         )
         def cmd_description(ctx: Any) -> None:
             desc = " ".join(ctx.args) if ctx.args else ""
@@ -352,7 +350,9 @@ class BaseGroup:
                 ctx.reply(f"You are not a member of this {self._kind}.")
                 return
             if self._is_admin(ctx.sender):
-                ctx.reply("Admins cannot leave. Ask an Admin Group admin to remove you.")
+                ctx.reply(
+                    "Admins cannot leave. Ask an Admin Group admin to remove you."
+                )
                 return
             self._remove_member(ctx.sender)
             ctx.reply(f"You have left the {self._kind}.")
@@ -368,29 +368,23 @@ class BaseGroup:
     def _register_message_handler(self) -> None:
         raise NotImplementedError
 
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
-
-    def setup(self) -> None:
+    def _show_qr_code(self) -> None:
         """Log address and QR code."""
         label = self._kind
         logger.critical("")
         logger.critical("=" * 75)
-        logger.critical("  %s: %s", label, self.name)
+        logger.critical("%s: %s", label, self.name)
         logger.critical("=" * 75)
         logger.critical("")
         if self.bot.local:
             logger.critical(
-                "  LXMF Address: %s",
+                "LXMF Address: %s",
                 RNS.prettyhexrep(self.bot.local.hash),
             )
             dest_hex = RNS.hexrep(self.bot.local.hash, delimit=False)
-            pub_hex = RNS.hexrep(
-                self.bot.identity.get_public_key(), delimit=False
-            )
+            pub_hex = RNS.hexrep(self.bot.identity.get_public_key(), delimit=False)
             lxma_url = "lxma://" + dest_hex + ":" + pub_hex
-            logger.critical("  Columba link: %s", lxma_url)
+            logger.critical("Columba link: %s", lxma_url)
             logger.critical("")
             qr_text = qr_unicode(lxma_url)
             if qr_text:
@@ -402,6 +396,7 @@ class BaseGroup:
     def start(self) -> None:
         self._thread = threading.Thread(target=self.bot.run, args=(1,), daemon=True)
         self._thread.start()
+        self._show_qr_code()
 
     def stop(self) -> None:
         self.bot.cleanup()

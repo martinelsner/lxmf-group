@@ -10,13 +10,15 @@ A group can be public (anyone can join by sending a message) or private
 (only invited users can join).
 """
 
+from __future__ import annotations
+
 import logging
 import os
-from typing import Any
-
-from .base_group import BaseGroup
+from typing import Any, Callable
 
 from lxmfy import JSONStorage
+
+from .base_group import BaseGroup
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ class Group(BaseGroup):
     """A single distribution group backed by an LXMFBot."""
 
     _kind: str = "Group"
+    on_delete: "Callable[[Group], None] | None" = None
 
     @property
     def is_public(self) -> bool:
@@ -35,7 +38,7 @@ class Group(BaseGroup):
         self._storage.set("is_public", value)
 
     @staticmethod
-    def create(parent: str, name: str, admin: str) -> str:
+    def setup(base_dir: str, name: str, admin: str) -> str:
         """Create a group subdirectory named after its LXMF address.
 
         Stores the group name and seeds the creator as admin in the
@@ -44,7 +47,7 @@ class Group(BaseGroup):
         Returns the path to the newly created group directory.
         """
         identity, addr = BaseGroup._generate_identity()
-        path = os.path.join(parent, addr)
+        path = os.path.join(base_dir, addr)
         BaseGroup._create_data_dir(path, identity)
 
         storage = JSONStorage(BaseGroup._storage_dir(path))
@@ -61,6 +64,14 @@ class Group(BaseGroup):
         visibility = "Public" if self.is_public else "Private"
         return [f"Visibility: {visibility}"]
 
+    def _promote_to_admin(self, user_hash: str) -> None:
+        self.bot.permissions.assign_role(user_hash, "admin")
+        self.bot.admins.add(user_hash)
+
+    def _demote_from_admin(self, user_hash: str) -> None:
+        self.bot.permissions.remove_role(user_hash, "admin")
+        self.bot.admins.discard(user_hash)
+
     # ------------------------------------------------------------------
     # Group-specific commands
     # ------------------------------------------------------------------
@@ -69,8 +80,10 @@ class Group(BaseGroup):
         super()._register_commands()
 
         @self.bot.command(
-            name="add", description="Add a user to the group",
-            usage="/add <address>", admin_only=True,
+            name="add",
+            description="Add a user to the group",
+            usage="/add <address>",
+            admin_only=True,
         )
         def cmd_add(ctx: Any) -> None:
             address = ctx.args[0] if ctx.args else ""
@@ -84,8 +97,10 @@ class Group(BaseGroup):
             self._broadcast(f"{address} has been added.", exclude={address})
 
         @self.bot.command(
-            name="admin", description="Add or promote a user to admin",
-            usage="/admin <address>", admin_only=True,
+            name="admin",
+            description="Add or promote a user to admin",
+            usage="/admin <address>",
+            admin_only=True,
         )
         def cmd_admin(ctx: Any) -> None:
             address = ctx.args[0] if ctx.args else ""
@@ -97,37 +112,46 @@ class Group(BaseGroup):
                 return
             if self._is_member(address):
                 self._promote_to_admin(address)
-                self.bot.send(address, f"You have been promoted to admin of {self.name}.")
-                self._broadcast(f"{address} has been promoted to admin.", exclude={address})
+                self.bot.send(
+                    address, f"You have been promoted to admin of {self.name}."
+                )
+                self._broadcast(
+                    f"{address} has been promoted to admin.", exclude={address}
+                )
                 return
             self._add_member(address, is_admin=True)
             self._broadcast(f"{address} has been added as admin.", exclude={address})
 
         @self.bot.command(
-            name="public", description="Make the group public", admin_only=True,
+            name="public",
+            description="Make the group public",
+            admin_only=True,
         )
         def cmd_public(ctx: Any) -> None:
             self.is_public = True
             ctx.reply("Group is now public. Anyone can join by sending a message.")
 
         @self.bot.command(
-            name="private", description="Make the group private", admin_only=True,
+            name="private",
+            description="Make the group private",
+            admin_only=True,
         )
         def cmd_private(ctx: Any) -> None:
             self.is_public = False
             ctx.reply("Group is now private. Only invited users can join.")
 
         @self.bot.command(
-            name="delete", description="Delete this group", admin_only=True,
+            name="delete",
+            description="Delete this group",
+            admin_only=True,
         )
         def cmd_delete(ctx: Any) -> None:
-            if not self.server:
+            if not self.on_delete:
                 ctx.reply("Server context not available.")
                 return
-            addr = self.destination_hash_str()
             self._broadcast("This group has been deleted.")
             try:
-                self.server.remove_group(addr)
+                self.on_delete(self)
                 ctx.reply("Group deleted.")
             except Exception as e:
                 ctx.reply(f"Error: {e}")
