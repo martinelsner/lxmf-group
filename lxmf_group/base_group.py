@@ -49,7 +49,10 @@ class BaseGroup:
             storage_path=self._storage_dir(data_dir),
             first_message_enabled=False,
             permissions_enabled=True,
-            message_persistence_enabled=True,
+            # Don't enable message_persistence — it replays already-delivered
+            # messages on restart because the queue is persisted before delivery
+            # is confirmed, causing duplicates for all group members.
+            message_persistence_enabled=False,
             autopeer_propagation=True,
         )
 
