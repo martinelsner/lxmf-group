@@ -196,6 +196,7 @@ def group_server(isolated_rns, tmp_path):
         data_dir = str(tmp_path / "server")
         groups_dir = str(tmp_path / "server" / "groups")
         groups = []
+        propagation_node = None
 
     group = Group(data_dir=group_dir, server=_StubServer())
     group._show_qr_code()

@@ -13,11 +13,13 @@ PermissionManager role system:
 import logging
 import os
 import threading
+import time
 from functools import cache, cached_property
 from typing import Any
 
 import msgpack
 import RNS
+from LXMF import LXMRouter
 from lxmfy import DefaultPerms, JSONStorage, LXMFBot
 from lxmfy.help import HelpFormatter, HelpSystem
 
@@ -26,6 +28,9 @@ from .interfaces import ServerInterface
 from .constants import ANNOUNCE_INTERVAL
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+# How often (in seconds) each bot polls its propagation node for new messages.
+_PROPAGATION_SYNC_INTERVAL = 30
 
 
 class BaseGroup:
@@ -54,7 +59,7 @@ class BaseGroup:
             # messages on restart because the queue is persisted before delivery
             # is confirmed, causing duplicates for all group members.
             message_persistence_enabled=False,
-            autopeer_propagation=True,
+            propagation_node=server.propagation_node,
         )
 
         self.bot.commands = CommandDict(self.bot.commands)
@@ -397,7 +402,38 @@ class BaseGroup:
     def start(self) -> None:
         self._thread = threading.Thread(target=self.bot.run, args=(1,), daemon=True)
         self._thread.start()
+        self._sync_stop = threading.Event()
+        self._sync_thread = threading.Thread(
+            target=self._propagation_sync_loop, daemon=True
+        )
+        self._sync_thread.start()
         self._show_qr_code()
 
     def stop(self) -> None:
+        self._sync_stop.set()
         self.bot.cleanup()
+
+    # ------------------------------------------------------------------
+    # Propagation node sync
+    # ------------------------------------------------------------------
+
+    def _propagation_sync_loop(self) -> None:
+        """Periodically download messages waiting on the propagation node."""
+        while not self._sync_stop.is_set():
+            self._sync_stop.wait(_PROPAGATION_SYNC_INTERVAL)
+            if self._sync_stop.is_set():
+                break
+            try:
+                router = self.bot.router
+                if router is None:
+                    continue
+                if router.get_outbound_propagation_node() is None:
+                    continue
+                if router.propagation_transfer_state > LXMRouter.PR_IDLE:
+                    continue
+                router.request_messages_from_propagation_node(self.bot.identity)
+                logger.debug(
+                    "%s: requested propagation node sync", self._kind,
+                )
+            except Exception:
+                logger.exception("%s: propagation sync error", self._kind)

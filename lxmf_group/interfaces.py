@@ -14,3 +14,4 @@ class ServerInterface(ABC):
     data_dir: str
     groups_dir: str
     groups: list[Group]
+    propagation_node: str | None

@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 class Server(ServerInterface):
     """Holds the shared RNS instance and delegates group management to AdminGroup."""
 
-    def __init__(self, data_dir: str = None, rnsconfig: str = None):
+    def __init__(self, data_dir: str = None, rnsconfig: str = None, propagation_node: str = None):
         self.data_dir = self._setup_data_dir(data_dir)
         self.groups_dir = self._setup_groups_dir(self.data_dir)
         self.groups: list[Group] = []
+        self.propagation_node = propagation_node
 
         # Initialize Reticulum once with the default system config before
         # any LXMFBot instances are created.  Each bot will attempt its own

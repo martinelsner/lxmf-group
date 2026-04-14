@@ -27,11 +27,19 @@ def main():
         "--rnsconfig", type=str, default=None,
         help="Path to alternative Reticulum config directory",
     )
+    parser.add_argument(
+        "-p", "--propagation-node", type=str, default=None,
+        help="Destination hash of the propagation node to use for message sync",
+    )
 
     params = parser.parse_args()
     setup_logging(getattr(logging, params.loglevel))
 
-    server = Server(data_dir=params.data, rnsconfig=params.rnsconfig)
+    server = Server(
+        data_dir=params.data,
+        rnsconfig=params.rnsconfig,
+        propagation_node=params.propagation_node,
+    )
     server.run()
 
 
