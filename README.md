@@ -77,13 +77,14 @@ The creator is automatically assigned as admin of the new group.
 ## Startup parameters
 
 ```text
-usage: lxmf-group [-h] [-V] [-d DATA] [--rnsconfig RNSCONFIG] [-l LOGLEVEL]
+usage: lxmf-group [-h] [-V] [-d DATA] [--rnsconfig RNSCONFIG] [-p PROPAGATION_NODE] [-l LOGLEVEL]
 
 optional arguments:
   -h, --help            show this help message and exit
   -V, --version         show version and exit
   -d DATA, --data DATA  server data directory
   --rnsconfig RNSCONFIG path to alternative Reticulum config directory
+  -p, --propagation-node PROPAGATION_NODE   destination hash of the propagation node to use for message sync
   -l LOGLEVEL           log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 ```
 
