@@ -29,7 +29,7 @@ class Server(ServerInterface):
         # any LXMFBot instances are created.  Each bot will attempt its own
         # RNS.Reticulum() call, hit the "already running" guard, and reuse
         # this instance.
-        RNS.Reticulum(configdir=rnsconfig)
+        RNS.Reticulum(configdir=rnsconfig, require_shared_instance=True)
 
         admin_group_data_dir = AdminGroup.setup(server=self)
         self.admin_group = AdminGroup(server=self, data_dir=admin_group_data_dir)

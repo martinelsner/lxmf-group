@@ -1,0 +1,11 @@
+.git
+.hypothesis
+.idea
+.pytest_cache
+.vscode
+.kiro
+.venv
+result
+*.egg-info
+dist
+build

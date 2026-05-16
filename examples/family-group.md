@@ -4,6 +4,10 @@ A simple private group where members can only be added by admin invitation.
 
 ## Setup
 
+**Prerequisite:** rnsd must be running. lxmf-group does not start its own Reticulum instance — it connects to an existing rnsd process.
+
+Start rnsd first, then:
+
 ```bash
 lxmf-group
 ```

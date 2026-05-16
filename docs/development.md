@@ -4,6 +4,8 @@
 
 [Nix](https://nixos.org/) is used to provide a reproducible development shell.
 
+**Important:** When running lxmf-group during development, you must have rnsd running first. lxmf-group does not start its own Reticulum instance — it connects to an existing rnsd process via `require_shared_instance=True`.
+
 ## Getting started
 
 ```bash

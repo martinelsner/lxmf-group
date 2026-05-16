@@ -1,5 +1,7 @@
 # Running lxmf-group on NixOS
 
+**Prerequisite:** rnsd must be running. lxmf-group does not start its own Reticulum instance — it connects to an existing rnsd process via `require_shared_instance=True`. Ensure rnsd is enabled and started before lxmf-group.
+
 This project includes a `default.nix`. On NixOS you can fetch and import it directly.
 
 Add the following to your `configuration.nix`:
@@ -12,33 +14,31 @@ let
   lxmf-group = import (builtins.fetchTarball "https://codeberg.org/melsner/lxmf_group/archive/main.tar.gz") { pkgs = unstable; };
 in
 {
-  users.users.reticulum = {
+  users.users.lxmf-group = {
     isSystemUser = true;
-    group = "reticulum";
-    home = "/var/lib/reticulum";
-    createHome = true;
+    group = "lxmf-group";
   };
 
-  users.groups.reticulum = {};
+  users.groups.lxmf-group = {};
 
   systemd.services.lxmf-group = {
     description = "LXMF Distribution Group";
-    after = [ "network.target" ];
+    after = [ "network.target" "rnsd.service" ];
     wantedBy = [ "multi-user.target" ];
 
     serviceConfig = {
       Type = "simple";
-      User = "reticulum";
-      Group = "reticulum";
-      WorkingDirectory = "/var/lib/reticulum";
-      ExecStart = "${lxmf-group}/bin/lxmf-group --data /var/lib/reticulum/lxmf-group";
+      User = "lxmf-group";
+      Group = "lxmf-group";
+      WorkingDirectory = "/var/lib/lxmf-group";
+      ExecStart = "${lxmf-group}/bin/lxmf-group --data /var/lib/lxmf-group/lxmf-group --rnsconfig /etc/reticulum";
       Restart = "on-failure";
       RestartSec = 5;
       NoNewPrivileges = true;
       PrivateTmp = true;
       ProtectSystem = "full";
       ProtectHome = true;
-      ReadWritePaths = "/var/lib/reticulum";
+      ReadWritePaths = "/var/lib/lxmf-group";
       ProtectKernelTunables = true;
       ProtectKernelModules = true;
       ProtectControlGroups = true;

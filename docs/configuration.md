@@ -40,7 +40,9 @@ These are managed by LXMFy's storage and permission systems. You generally don't
 
 ## Reticulum
 
-The server initializes a single RNS Reticulum instance using the default system config (`~/.reticulum/config`). All groups share this instance. An alternate config directory can be specified with `--rnsconfig <path>`.
+lxmf-group does not start its own Reticulum instance. It connects to an existing `rnsd` process via `require_shared_instance=True`. You must be running rnsd before starting lxmf-group.
+
+The server initializes a single RNS Reticulum instance using the default system config (`/etc/reticulum`). All groups share this instance. An alternate config directory can be specified with `--rnsconfig <path>`.
 
 ```bash
 nano ~/.reticulum/config

@@ -24,7 +24,7 @@ def main():
         help="Logging level (default: INFO)",
     )
     parser.add_argument(
-        "--rnsconfig", type=str, default=None,
+        "--rnsconfig", type=str, default="/etc/reticulum",
         help="Path to alternative Reticulum config directory",
     )
     parser.add_argument(

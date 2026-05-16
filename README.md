@@ -21,11 +21,41 @@ Beta software, work in progress.
 
 ## Installation
 
+### Quick install (pipx)
+
 ```bash
 sudo apt update
 sudo apt install python3-cryptography pipx
 pipx install --system-site-packages git+https://codeberg.org/melsner/lxmf_group.git
 ```
+
+### Using the installer scripts (optional)
+
+If you prefer to use installer scripts similar to [reticulum-installer](https://codeberg.org/melsner/reticulum-installer), you can use the scripts in the `installer/` directory. These are designed to work alongside reticulum-installer — they will automatically detect and use the same virtual environment (`/opt/reticulum`) if rnsd and lxmd were installed with reticulum-installer.
+
+**Install:**
+
+```bash
+sudo bash installer/debian/install.sh
+```
+
+**Uninstall:**
+
+```bash
+sudo bash installer/debian/uninstall.sh
+```
+
+#### Custom paths
+
+If rnsd and lxmd were installed in a different location, the installer will attempt to detect them. For manual customization, you can edit the service file at `/etc/systemd/system/lxmf-group.service` and modify:
+
+- `ExecStart` — change the path to the `lxmf-group` binary
+- `--data` — change the data directory path
+- `--rnsconfig` — change the Reticulum config directory path
+
+After editing, run `systemctl daemon-reload && systemctl restart lxmf-group`.
+
+If you're not using reticulum-installer and want to use a custom virtual environment location, modify the install script to set `VENV_DIR` to your preferred path before running it.
 
 Configure Reticulum to suit your network:
 
@@ -34,6 +64,10 @@ nano ~/.reticulum/config
 ```
 
 ## Running
+
+**You must have a running `rnsd` instance before starting lxmf-group.** lxmf-group does not start its own Reticulum instance — it connects to an existing one via the `require_shared_instance=True` mechanism. If no rnsd process is running, lxmf-group will exit with an error.
+
+Start rnsd first, then:
 
 ```bash
 lxmf-group
@@ -90,16 +124,18 @@ optional arguments:
 
 ## Run as a systemd service
 
+**Prerequisite:** rnsd must be running. lxmf-group does not start its own Reticulum instance — it connects to an existing rnsd process via `require_shared_instance=True`. Enable and start rnsd first.
+
 Create a dedicated system user:
 
 ```bash
-sudo useradd --system --shell /usr/sbin/nologin --create-home --home-dir /var/lib/reticulum reticulum
+sudo useradd --system --shell /usr/sbin/nologin lxmf-group
 ```
 
 Install:
 
 ```bash
-sudo --user reticulum pipx install --system-site-packages git+https://codeberg.org/melsner/lxmf_group.git
+sudo --user lxmf-group pipx install --system-site-packages --python /opt/lxmf-group/bin/python3 git+https://codeberg.org/melsner/lxmf_group.git
 ```
 
 Create `/etc/systemd/system/lxmf-group.service`:
@@ -107,14 +143,16 @@ Create `/etc/systemd/system/lxmf-group.service`:
 ```ini
 [Unit]
 Description=lxmf-group
-After=network.target
+After=network.target rnsd.service
+Wants=network.target rnsd.service
 
 [Service]
 Type=simple
 Restart=on-failure
 RestartSec=5
-User=reticulum
-ExecStart=/var/lib/reticulum/.local/bin/lxmf-group
+User=lxmf-group
+Group=lxmf-group
+ExecStart=/opt/lxmf-group/bin/lxmf-group --data /var/lib/lxmf-group/lxmf-group --rnsconfig /etc/reticulum
 
 [Install]
 WantedBy=multi-user.target

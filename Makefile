@@ -13,6 +13,12 @@ install: venv ## Install the project in editable mode with dev deps
 
 test: install ## Run the test suite
 	$(VENV)/bin/pytest tests/
+	@echo ""
+	@echo "=== Running Debian installer tests ==="
+	@bash installer/debian/test/run.sh
+	@echo ""
+	@echo "=== Running Alpine installer tests ==="
+	@bash installer/alpine/test/run.sh
 
 build: install ## Build sdist and wheel for PyPI
 	uv build
